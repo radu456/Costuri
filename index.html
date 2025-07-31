@@ -177,7 +177,7 @@
     async function checkConnection() {
       try {
         // Try to fetch a small amount of data to check connection
-        await getDoc(doc(db, "costuri", "canvaVideo")); // Check a specific doc
+        await getDocs(collection(db, "costuri"));
         isOnline = true;
         document.getElementById("status").textContent = "Online";
         document.getElementById("status").className = "status online";
@@ -379,3 +379,4 @@
   </script>
 </body>
 </html>
+
