@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contor Costuri</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f2f2f2;
+    }
+    h1 {
+      text-align: center;
+    }
+    .total {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: #333;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 18px;
+    }
+    .sync-info {
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .sync-positive {
+      color: #4CAF50;
+    }
+    .sync-negative {
+      color: #f44336;
+    }
+    .item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 10px 0;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    .buttons button {
+      margin: 0 5px;
+      font-size: 18px;
+    }
+    .reset-btn {
+      margin-top: 30px;
+      display: block;
+      padding: 10px 20px;
+      font-size: 16px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .status {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: #333;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+    .status.online {
+      background: #4CAF50;
+    }
+    .status.offline {
+      background: #f44336;
+    }
+  </style>
+</head>
+<body>
+  <h1>Contor Costuri</h1>
+  <div class="total">
+    Total: <span id="total">0</span> RON
+    <div class="sync-info" id="syncInfo"></div>
+  </div>
+
+  <div class="item">
+    <span>🎬 Videoclipuri în Canva</span>
+    <div class="buttons">
+      <span id="canvaVideo">0</span>
+      <button onclick="increase(\'canvaVideo\')">+</button>
+    </div>
+  </div>
+
+  <div class="item">
+    <span>📄 Șablon Canva</span>
+    <div class="buttons">
+      <span id="canvaTemplate">0</span>
+      <button onclick="increase(\'canvaTemplate\')">+</button>
+    </div>
+  </div>
+
+  <div class="item">
+    <span>📊 Kahoot</span>
+    <div class="buttons">
+      <span id="kahoot">0</span>
+      <button onclick="increase(\'kahoot\')">+</button>
+    </div>
+  </div>
+
+  <div class="item">
+    <span>📱 Aplicație Manus</span>
+    <div class="buttons">
+      <span id="manus">0</span>
+      <button onclick="increase(\'manus\')">+</button>
+    </div>
+  </div>
+
+  <div class="item">
+    <span>🎙️ Podcast</span>
+    <div class="buttons">
+      <span id="podcast">0</span>
+      <button onclick="increase(\'podcast\')">+</button>
+    </div>
+  </div>
+
+  <div class="item">
+    <span>🎞️ Videoclip</span>
+    <div class="buttons">
+      <span id="videoclip">0</span>
+      <button onclick="increase(\'videoclip\')">+</button>
+    </div>
+  </div>
+
+  <div class="item">
+    <span>🎬 Trailer</span>
+    <div class="buttons">
+      <span id="trailer">0</span>
+      <button onclick="increase(\'trailer\')">+</button>
+    </div>
+  </div>
+
+  <button class="reset-btn" onclick="resetAll()">🔄 Plătit</button>
+  <div class="status" id="status">Offline</div>
+
+  <script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+    // Your web app\'s Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDShS2WY7Ojy7H4_5dVEINXJdjiFdV38AQ",
+      authDomain: "datorii-75836.firebaseapp.com",
+      projectId: "datorii-75836",
+      storageBucket: "datorii-75836.firebasestorage.app",
+      messagingSenderId: "409613218855",
+      appId: "1:409613218855:web:860846fd76b29327a2ca02",
+      measurementId: "G-8062XCBTFT"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let isOnline = false;
+    
+    const prices = {
+      canvaVideo: 40,
+      canvaTemplate: 20,
+      kahoot: 20,
+      manus: 35,
+      podcast: 200,
+      videoclip: 75,
+      trailer: 75,
+    };
+
+    async function checkConnection() {
+      try {
+        // Try to fetch a small amount of data to check connection
+        await getDoc(doc(db, "costuri", "canvaVideo")); // Check a specific doc
+        isOnline = true;
+        document.getElementById("status").textContent = "Online";
+        document.getElementById("status").className = "status online";
+        return true;
+      } catch (error) {
+        console.log("Firebase offline or error:", error);
+      }
+      
+      isOnline = false;
+      document.getElementById("status").textContent = "Offline";
+      document.getElementById("status").className = "status offline";
+      return false;
+    }
+
+    async function loadState() {
+      let total = 0;
+      let totalDatorii = 0;
+      
+      if (await checkConnection()) {
+        // Online - get data from Firestore
+        try {
+          const costuriCol = collection(db, "costuri");
+          const costuriSnapshot = await getDocs(costuriCol);
+          let currentCosturi = {};
+          costuriSnapshot.docs.forEach(doc => {
+            currentCosturi[doc.id] = doc.data().count;
+          });
+
+          for (const key in prices) {
+            const count = currentCosturi[key] || 0;
+            document.getElementById(key).innerText = count;
+            total += count * prices[key];
+          }
+            
+          // Get total datorii from Firestore
+          const datoriiCol = collection(db, "datorii");
+          const datoriiSnapshot = await getDocs(datoriiCol);
+          datoriiSnapshot.docs.forEach(doc => {
+            totalDatorii += doc.data().valoare;
+          });
+          updateSyncInfo(totalDatorii);
+
+        } catch (error) {
+          console.error("Eroare la preluarea datelor din Firestore:", error);
+          // Fallback to local storage
+          loadFromLocalStorage();
+          document.getElementById("syncInfo").innerHTML = ""; // Clear sync info if offline
+        }
+      } else {
+        // Offline - use local storage
+        loadFromLocalStorage();
+        document.getElementById("syncInfo").innerHTML = "";
+      }
+      
+      // Update combined total
+      updateCombinedTotal(total, totalDatorii);
+    }
+
+    function loadFromLocalStorage() {
+      let total = 0;
+      for (const key in prices) {
+        const count = parseInt(localStorage.getItem(key)) || 0;
+        document.getElementById(key).innerText = count;
+        total += count * prices[key];
+      }
+      document.getElementById("total").innerText = total;
+      document.getElementById("syncInfo").innerHTML = "";
+    }
+
+    function updateSyncInfo(totalDatorii) {
+      const syncInfo = document.getElementById("syncInfo");
+      if (totalDatorii !== undefined) {
+        if (totalDatorii > 0) {
+          syncInfo.innerHTML = `<span class="sync-positive">+${totalDatorii} RON din datorii</span>`;
+        } else if (totalDatorii < 0) {
+          syncInfo.innerHTML = `<span class="sync-negative">${totalDatorii} RON din datorii</span>`;
+        } else {
+          syncInfo.innerHTML = `<span>0 RON din datorii</span>`;
+        }
+      }
+    }
+
+    function updateCombinedTotal(totalCosturi, totalDatorii) {
+      const totalCombined = totalCosturi + (totalDatorii || 0);
+      document.getElementById("total").innerText = totalCombined;
+    }
+
+    async function increase(item) {
+      if (await checkConnection()) {
+        // Online - send to Firestore
+        try {
+          const itemRef = doc(db, "costuri", item);
+          const itemSnap = await getDoc(itemRef);
+          let count = 0;
+          if (itemSnap.exists()) {
+            count = itemSnap.data().count;
+          }
+          await setDoc(itemRef, { count: count + 1 });
+          await loadState();
+        } catch (error) {
+          console.error("Eroare la incrementarea costului în Firestore:", error);
+          // Fallback to local storage
+          increaseLocalStorage(item);
+        }
+      } else {
+        // Offline - save to local storage
+        increaseLocalStorage(item);
+      }
+    }
+
+    function increaseLocalStorage(item) {
+      let count = parseInt(localStorage.getItem(item)) || 0;
+      count++;
+      localStorage.setItem(item, count);
+      loadFromLocalStorage();
+    }
+
+    async function resetAll() {
+      if (confirm("Ești sigur că vrei să resetezi toate costurile?")) {
+        if (await checkConnection()) {
+          try {
+            const batch = writeBatch(db);
+            for (const key in prices) {
+              const itemRef = doc(db, "costuri", key);
+              batch.set(itemRef, { count: 0 });
+            }
+            await batch.commit();
+            await loadState();
+          } catch (error) {
+            console.error("Eroare la resetarea costurilor în Firestore:", error);
+            // Fallback to local storage
+            resetLocalStorage();
+          }
+        } else {
+          resetLocalStorage();
+        }
+      }
+    }
+
+    function resetLocalStorage() {
+      for (const key in prices) {
+        localStorage.setItem(key, 0);
+      }
+      loadFromLocalStorage();
+    }
+
+    // Sync local data to server when coming online
+    async function syncLocalToServer() {
+      if (!isOnline) return;
+      
+      try {
+        const costuriCol = collection(db, "costuri");
+        const costuriSnapshot = await getDocs(costuriCol);
+        let serverCosturi = {};
+        costuriSnapshot.docs.forEach(doc => {
+          serverCosturi[doc.id] = doc.data().count;
+        });
+
+        for (const key in prices) {
+          const localCount = parseInt(localStorage.getItem(key)) || 0;
+          const serverCount = serverCosturi[key] || 0;
+          
+          // If local has more, sync the difference
+          if (localCount > serverCount) {
+            const itemRef = doc(db, "costuri", key);
+            await setDoc(itemRef, { count: localCount });
+          }
+        }
+        
+        // Clear local storage after successful sync
+        for (const key in prices) {
+          localStorage.setItem(key, 0);
+        }
+      } catch (error) {
+        console.error("Eroare la sincronizarea datelor locale cu Firestore:", error);
+      }
+    }
+
+    if (\'serviceWorker\' in navigator) {
+      window.addEventListener(\'load\', () => {
+        navigator.serviceWorker.register(\'service-worker.js\');
+      });
+    }
+
+    window.onload = async () => {
+      await loadState();
+      await syncLocalToServer();
+      
+      // Check connection every 30 seconds
+      setInterval(async () => {
+        const wasOnline = isOnline;
+        await checkConnection();
+        if (!wasOnline && isOnline) {
+          await syncLocalToServer();
+          await loadState();
+        }
+      }, 30000);
+    };
+  </script>
+</body>
+</html>
